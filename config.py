@@ -26,9 +26,10 @@ AUSTIN_TARGET_ZIPS = {
 }
 
 PRODUCTS = [
-    {"name": "Pokemon Shirt Boys Gray Graphic Tee", "brand": "Pokemon", "tcin": "94900587"},
-    {"name": "UNO Elite NFL Red Zone Draft Pack",   "brand": "Other",   "tcin": "94111119"},
-    {"name": "LEGO Classic Creative Suitcase 10713","brand": "Other",   "tcin": "52699306"},
+    {"name": "One Piece Card Game Illustration Box Volume 5", "brand": "OnePiece", "tcin": "94827558"},
+    {"name": "One Piece Card Game Illustration Box Volume 6", "brand": "OnePiece", "tcin": "94827555"},
+    {"name": "Pokemon ME2.5 Elite Trainer Box",               "brand": "Pokemon",  "tcin": "95082118"},
+    {"name": "Pokemon ME2.5 Ascended Heroes Booster Pack",    "brand": "Pokemon",  "tcin": "1009318827"},
 ]
 
 ENABLED_RETAILERS = {
