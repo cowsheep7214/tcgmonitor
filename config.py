@@ -30,7 +30,6 @@ PRODUCTS = [
     {"name": "One Piece Card Game Illustration Box Volume 6", "brand": "OnePiece", "tcin": "94827555"},
     {"name": "Pokemon ME2.5 Elite Trainer Box",               "brand": "Pokemon",  "tcin": "95082118"},
     {"name": "Pokemon ME2.5 Ascended Heroes Booster Pack",    "brand": "Pokemon",  "tcin": "1009318827"},
-    {"name": "LEGO Minecraft Illager Desert Patrol 21267",     "brand": "Other",    "tcin": "92538291"},
 ]
 
 ENABLED_RETAILERS = {
