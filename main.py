@@ -76,10 +76,8 @@ def send_discord_alert(result):
         logger.error(f"Discord failed: {e}")
 
 # ════════════════════════════════════════════════
-# TARGET MONITOR
+# TARGET MONITOR — batched (all TCINs per store in 1 request)
 # ════════════════════════════════════════════════
-# Every Austin-area Target store ZIP code
-# Bot checks each ZIP — Target API returns the nearest store to that ZIP
 AUSTIN_TARGET_ZIPS = {
     "78702": ("3342", "Austin Saltillo"),
     "78705": ("3250", "Austin UT Campus"),
@@ -99,11 +97,16 @@ AUSTIN_TARGET_ZIPS = {
     "78628": ("1982", "Georgetown"),
 }
 
-def check_target(product):
-    tcin = product.get("tcin")
-    if not tcin:
-        return []
+# Build a TCIN -> product name lookup
+def build_tcin_map():
+    return {p["tcin"]: p for p in cfg.PRODUCTS}
 
+def check_target_all_stores():
+    """
+    1 request per store (all TCINs batched) = 16 requests per cycle instead of 64.
+    """
+    tcin_map = build_tcin_map()
+    tcins_str = ",".join(tcin_map.keys())
     results = []
 
     for zip_code, (store_id, store_label) in AUSTIN_TARGET_ZIPS.items():
@@ -112,7 +115,7 @@ def check_target(product):
                 f"https://redsky.target.com/redsky_aggregations/v1/web/"
                 f"product_summary_with_fulfillment_v1"
                 f"?key=9f36aeafbe60771e321a7cc95a78140772ab3e96"
-                f"&tcins={tcin}"
+                f"&tcins={tcins_str}"
                 f"&store_id={store_id}"
                 f"&zip={zip_code}"
             )
@@ -123,16 +126,19 @@ def check_target(product):
 
             summaries = r.json().get("data", {}).get("product_summaries", [])
             for s in summaries:
-                fulfillment  = s.get("fulfillment", {})
-                sold_out     = fulfillment.get("sold_out", True)
-                oos_all      = fulfillment.get("is_out_of_stock_in_all_store_locations", True)
-                store_opts   = fulfillment.get("store_options", [])
+                tcin = str(s.get("tcin", ""))
+                product = tcin_map.get(tcin)
+                if not product:
+                    continue
+
+                fulfillment = s.get("fulfillment", {})
+                store_opts  = fulfillment.get("store_options", [])
 
                 for opt in store_opts:
                     in_store_status = opt.get("in_store_only", {}).get("availability_status", "")
                     pickup_status   = opt.get("order_pickup", {}).get("availability_status", "")
                     qty             = opt.get("location_available_to_promise_quantity", 0)
-                    store_name      = opt.get("store", {}).get("location_name", f"Store {store_id}")
+                    store_name      = opt.get("store", {}).get("location_name", store_label)
 
                     is_available = in_store_status == "IN_STOCK" or pickup_status in ("IN_STOCK", "LIMITED_STOCK")
 
@@ -144,7 +150,7 @@ def check_target(product):
                             "product":  product["name"],
                             "status":   "IN_STOCK",
                             "qty":      qty,
-                            "price":    None,  # add price endpoint later
+                            "price":    None,
                             "url":      f"https://www.target.com/p/-/A-{tcin}",
                         })
 
@@ -163,7 +169,6 @@ def main():
     logger.info(f"   ZIP: {cfg.DEFAULT_ZIP} | Every {cfg.POLL_INTERVAL}s")
     logger.info("   Press Ctrl+C to stop\n")
 
-    # Send startup ping to Discord
     if cfg.DISCORD_WEBHOOK_URL:
         try:
             requests.post(cfg.DISCORD_WEBHOOK_URL, json={
@@ -180,11 +185,9 @@ def main():
         logger.info(f"⏱  Checking stock… {datetime.now(timezone.utc).strftime('%H:%M UTC')}")
         found_any = False
 
-        for product in cfg.PRODUCTS:
-            if not cfg.ENABLED_RETAILERS.get("target", False):
-                continue
+        if cfg.ENABLED_RETAILERS.get("target", False):
             try:
-                hits = check_target(product)
+                hits = check_target_all_stores()
                 for hit in hits:
                     if is_new(hit):
                         found_any = True
@@ -192,7 +195,7 @@ def main():
                         logger.info(f"🚨 ALERT SENT: {hit['product']} @ {hit['store']} ({int(hit.get('qty',0))} in stock)")
                         send_discord_alert(hit)
             except Exception as e:
-                logger.error(f"Error checking {product['name']}: {e}")
+                logger.error(f"Error checking Target: {e}")
 
         if not found_any:
             logger.info("😴 No new stock this round.\n")
